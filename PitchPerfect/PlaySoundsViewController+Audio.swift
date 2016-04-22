@@ -21,9 +21,6 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
         static let AudioEngineError = "Audio Engine Error"
     }
     
-    // raw values correspond to sender tags
-    enum PlayingState { case Playing, NotPlaying }
-    
     // MARK: Audio Functions
     
     func setupAudio() {
@@ -37,6 +34,7 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
     }
     
     func playSound(rate rate: Float? = nil, pitch: Float? = nil, echo: Bool = false, reverb: Bool = false) {
+        var allAudioNodes = [AVAudioNode]()
         
         // initialize audio engine components
         audioEngine = AVAudioEngine()
@@ -44,8 +42,42 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
         // node for playing audio
         audioPlayerNode = AVAudioPlayerNode()
         audioEngine.attachNode(audioPlayerNode)
+        allAudioNodes.append(audioPlayerNode)
         
         // node for adjusting rate/pitch
+        let changeRatePitchNode = generateChangeRatePitchNode(rate: rate, pitch: pitch)
+        audioEngine.attachNode(changeRatePitchNode)
+        allAudioNodes.append(changeRatePitchNode)
+        
+        // node for echo
+        let echoNode = AVAudioUnitDistortion()
+        echoNode.loadFactoryPreset(.MultiEcho1)
+        audioEngine.attachNode(echoNode)
+        if echo {
+            allAudioNodes.append(echoNode)
+        }
+        
+        // node for reverb
+        let reverbNode = AVAudioUnitReverb()
+        reverbNode.loadFactoryPreset(.Cathedral)
+        reverbNode.wetDryMix = 50
+        audioEngine.attachNode(reverbNode)
+        if reverb {
+            allAudioNodes.append(reverbNode)
+        }
+        
+        // connect nodes
+        allAudioNodes.append(audioEngine.outputNode)
+        connectAudioNodes(allAudioNodes)
+        
+        // schedule to play and start the engine!
+        if scheduleAudioPlay(rate: rate) {
+            // play the recording!
+            audioPlayerNode.play()
+        }
+    }
+    
+    func generateChangeRatePitchNode(rate rate: Float? = nil, pitch: Float? = nil) -> AVAudioUnitTimePitch {
         let changeRatePitchNode = AVAudioUnitTimePitch()
         if let pitch = pitch {
             changeRatePitchNode.pitch = pitch
@@ -53,31 +85,10 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
         if let rate = rate {
             changeRatePitchNode.rate = rate
         }
-        audioEngine.attachNode(changeRatePitchNode)
-        
-        // node for echo
-        let echoNode = AVAudioUnitDistortion()
-        echoNode.loadFactoryPreset(.MultiEcho1)
-        audioEngine.attachNode(echoNode)
-        
-        // node for reverb
-        let reverbNode = AVAudioUnitReverb()
-        reverbNode.loadFactoryPreset(.Cathedral)
-        reverbNode.wetDryMix = 50
-        audioEngine.attachNode(reverbNode)
-        
-        // connect nodes
-        if echo == true && reverb == true {
-            connectAudioNodes(audioPlayerNode, changeRatePitchNode, echoNode, reverbNode, audioEngine.outputNode)
-        } else if echo == true {
-            connectAudioNodes(audioPlayerNode, changeRatePitchNode, echoNode, audioEngine.outputNode)
-        } else if reverb == true {
-            connectAudioNodes(audioPlayerNode, changeRatePitchNode, reverbNode, audioEngine.outputNode)
-        } else {
-            connectAudioNodes(audioPlayerNode, changeRatePitchNode, audioEngine.outputNode)
-        }
-        
-        // schedule to play and start the engine!
+        return changeRatePitchNode
+    }
+    
+    func scheduleAudioPlay(rate rate: Float? = nil) -> Bool{
         audioPlayerNode.stop()
         audioPlayerNode.scheduleFile(audioFile, atTime: nil) {
             
@@ -101,17 +112,15 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
             try audioEngine.start()
         } catch {
             showAlert(Alerts.AudioEngineError, message: String(error))
-            return
+            return false
         }
-        
-        // play the recording!
-        audioPlayerNode.play()
+        return true
     }
     
     
     // MARK: Connect List of Audio Nodes
     
-    func connectAudioNodes(nodes: AVAudioNode...) {
+    func connectAudioNodes(nodes: [AVAudioNode]) {
         for x in 0..<nodes.count-1 {
             audioEngine.connect(nodes[x], to: nodes[x+1], format: audioFile.processingFormat)
         }
@@ -123,7 +132,7 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
             stopTimer.invalidate()
         }
         
-        configureUI(.NotPlaying)
+        configureUI(false)
         
         if let audioPlayerNode = audioPlayerNode {
             audioPlayerNode.stop()
@@ -138,15 +147,9 @@ extension PlaySoundsVC: AVAudioPlayerDelegate {
     
     // MARK: UI Functions
 
-    func configureUI(playState: PlayingState) {
-        switch(playState) {
-        case .Playing:
-            setPlayButtonsEnabled(false)
-            stopButton.enabled = true
-        case .NotPlaying:
-            setPlayButtonsEnabled(true)
-            stopButton.enabled = false
-        }
+    func configureUI(isPlaying: Bool) {
+        setPlayButtonsEnabled(!isPlaying)
+        stopButton.enabled = isPlaying
     }
     
     func setPlayButtonsEnabled(enabled: Bool) {

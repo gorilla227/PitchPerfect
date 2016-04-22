@@ -18,30 +18,17 @@ class RecordSoundsVC: UIViewController, AVAudioRecorderDelegate {
     // MARK: Variables
     var audioRecorder: AVAudioRecorder!
     
-    // MARK: RecordingState
-    enum RecordingState {
-        case Recording, NotRecording
-    }
-    
     // MARK: Functions
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-        configureUI(.NotRecording)
+        configureUI(false)
     }
-
     
-    func configureUI(recordingState: RecordingState) {
-        switch recordingState {
-        case .Recording:
-            recordButton.enabled = false
-            stopRecordButton.enabled = true
-            recordingLabel.text = "Recording in progress"
-        case .NotRecording:
-            recordButton.enabled = true
-            stopRecordButton.enabled = false
-            recordingLabel.text = "Tap to Record"
-        }
+    func configureUI(isRecording: Bool) {
+        recordButton.enabled = !isRecording
+        stopRecordButton.enabled = isRecording
+        recordingLabel.text = isRecording ? "Recording in progress" : "Tap to Record"
     }
     
     func audioRecorderDidFinishRecording(recorder: AVAudioRecorder, successfully flag: Bool) {
@@ -65,7 +52,7 @@ class RecordSoundsVC: UIViewController, AVAudioRecorderDelegate {
     // MARK: IBActions
     @IBAction func recordAudio(sender: AnyObject) {
         print("record button pressed")
-        configureUI(.Recording)
+        configureUI(true)
         
         let docPath = NSSearchPathForDirectoriesInDomains(.DocumentDirectory, .UserDomainMask, true)[0] as String
         let fileName = "recordedAudio.wav"
@@ -82,7 +69,7 @@ class RecordSoundsVC: UIViewController, AVAudioRecorderDelegate {
     
     @IBAction func stopRecording(sender: AnyObject) {
         print("stop recording button pressed")
-        configureUI(.NotRecording)
+        configureUI(false)
         
         audioRecorder.stop()
         let session = AVAudioSession.sharedInstance()

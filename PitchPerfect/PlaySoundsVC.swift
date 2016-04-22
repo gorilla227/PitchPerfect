@@ -41,7 +41,7 @@ class PlaySoundsVC: UIViewController {
         originalDurationLabel.text = String(format:"%.2f", duration) + " seconds"
         
         setupAudio()
-        configureUI(.NotPlaying)
+        configureUI(false)
     }
     
     // MARK: IBActions
@@ -61,7 +61,7 @@ class PlaySoundsVC: UIViewController {
         case .Reverb:
             playSound(reverb: true)
         }
-        configureUI(.Playing)
+        configureUI(true)
     }
     
     @IBAction func stopButtonPressed(sender: AnyObject) {
